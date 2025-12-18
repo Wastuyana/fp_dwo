@@ -28,9 +28,13 @@ SELECT
   dc.CustomerType,
   COUNT(fs.SalesKey) AS TotalTransaksi
 FROM fact_sales fs
-JOIN dim_customer dc ON fs.CustomerKey = dc.CustomerKey
+JOIN dim_customer dc
+  ON fs.CustomerKey = dc.CustomerKey
 GROUP BY dc.CustomerType
+HAVING COUNT(fs.SalesKey) > 0
+ORDER BY TotalTransaksi DESC
 ";
+
 $r_customer = mysqli_query($conn, $q_customer);
 
 $custType = [];
@@ -45,10 +49,20 @@ while ($row = mysqli_fetch_assoc($r_customer)) {
 $q_channel = "
 SELECT
   ch.ChannelName,
-  SUM(fs.SalesAmount) AS TotalSales
+  COUNT(DISTINCT fs.SalesKey) AS TotalTransactions
 FROM fact_sales fs
-JOIN dim_channel ch ON fs.ChannelKey = ch.ChannelKey
+JOIN dim_channel ch
+  ON fs.ChannelKey = ch.ChannelKey
+JOIN dim_customer dc
+  ON fs.CustomerKey = dc.CustomerKey
+JOIN dim_time dt
+  ON fs.TimeKey = dt.TimeKey
+WHERE dc.IsNewCustomer = 1
+  AND dt.Quarter = 1
 GROUP BY ch.ChannelName
+HAVING COUNT(DISTINCT fs.SalesKey) > 0
+ORDER BY TotalTransactions DESC;
+
 ";
 $r_channel = mysqli_query($conn, $q_channel);
 
@@ -57,9 +71,10 @@ $channelData = [];
 while ($row = mysqli_fetch_assoc($r_channel)) {
     $channelData[] = [
         'name' => $row['ChannelName'],
-        'y' => (float) $row['TotalSales']
+        'y' => (int) $row['TotalTransactions']
     ];
 }
+    
 ?>
 
 <html lang="en">
@@ -126,7 +141,7 @@ while ($row = mysqli_fetch_assoc($r_channel)) {
                     <div class="col-lg-6 mb-4">
                         <div class="card shadow">
                             <div class="card-header font-weight-bold text-primary">
-                                Sales Channel Distribution
+                                Total Transactions by Channel (New Customer - Q1)
                             </div>
                             <div class="card-body">
                                 <div id="channelChart"></div>
@@ -190,10 +205,10 @@ Highcharts.chart('channelChart', {
     chart: { type: 'pie' },
     title: { text: null },
     series: [{
-        name: 'Sales',
-        colorByPoint: true,
-        data: <?= json_encode($channelData) ?>
-    }]
+    name: 'Total Transactions',
+    colorByPoint: true,
+    data: <?= json_encode($channelData) ?>
+}]
 });
 </script>
 

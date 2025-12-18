@@ -2,35 +2,29 @@
 <?php
 include 'koneksi.php';
 
-/* SALES PERFORMANCE */
+/* Sales Person Performance */
 
 $query = "
 SELECT
     de.SalesPersonName,
-    SUM(fs.SalesAmount) AS TotalSales,
-    de.BonusAmount,
-    de.CurrentPayRate
+    COUNT(fs.SalesKey) AS TotalTransactions
 FROM fact_sales fs
-JOIN dim_employee de
-    ON fs.EmployeeKey = de.EmployeeKey
-GROUP BY
-    de.EmployeeKey,
-    de.SalesPersonName,
-    de.BonusAmount,
-    de.CurrentPayRate
-ORDER BY TotalSales DESC
+JOIN dim_employee de ON fs.EmployeeKey = de.EmployeeKey
+WHERE de.SalesPersonName IS NOT NULL
+  AND de.SalesPersonName NOT IN ('Unknown', '0')
+GROUP BY de.SalesPersonName
+HAVING COUNT(fs.SalesKey) > 0
+ORDER BY TotalTransactions DESC
 ";
 
 $result = mysqli_query($conn, $query);
 
 $salesPerson = [];
-$salesAmount = [];
-$tableData   = [];
+$totalTrans  = [];
 
 while ($row = mysqli_fetch_assoc($result)) {
     $salesPerson[] = $row['SalesPersonName'];
-    $salesAmount[] = (float) $row['TotalSales'];
-    $tableData[]   = $row;
+    $totalTrans[]  = (int) $row['TotalTransactions'];
 }
 ?>
 
@@ -39,6 +33,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
     <title>Sales Performance</title>
 
@@ -53,108 +48,127 @@ while ($row = mysqli_fetch_assoc($result)) {
 
 <body id="page-top">
 
-<div id="wrapper">
+    <div id="wrapper">
 
-    <!-- Sidebar -->
-    <?php include 'sidebar.php'; ?>
+        <!-- Sidebar -->
+        <?php include 'sidebar.php'; ?>
 
-    <!-- Content Wrapper -->
-    <div id="content-wrapper" class="d-flex flex-column">
-        <div id="content">
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div class="container-fluid mt-4">
+                <h3 class="text-gray-800 m-4">
+                    Sales Performance
+                </h3>
 
-            <div class="container-fluid">
-                <h1 class="h3 mb-4 text-gray-800">Sales Performance</h1>
-
-                <!-- FILTER (dummy dulu) -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <input type="month" class="form-control">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div id="salesChart"></div>
                     </div>
                 </div>
 
-                <!-- ROW 1 : SalesPerson vs SalesAmount -->
-                <div class="row">
-                    <div class="col-lg-12 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header font-weight-bold text-primary">
-                                Sales Amount per Sales Person
-                            </div>
-                            <div class="card-body">
-                                <div id="salesChart"></div>
-                            </div>
+                <div class="card shadow mb-4">
+                    <div class="card-header font-weight-bold text-primary">
+                        Detail Transaksi (Cross Filter)
+                    </div>
+                    <div class="card-body">
+                        <div id="detailTable">
+                            <em>Klik sales person untuk melihat detail</em>
                         </div>
                     </div>
                 </div>
-
-                <!-- ROW 2 : Table Bonus & PayRate -->
-                <div class="row">
-                    <div class="col-lg-12 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header font-weight-bold text-primary">
-                                Bonus & Pay Rate
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-bordered">
-                                        <thead class="thead-dark">
-                                            <tr>
-                                                <th>Sales Person</th>
-                                                <th>Sales Amount</th>
-                                                <th>Bonus</th>
-                                                <th>Pay Rate</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($tableData as $row): ?>
-                                                <tr>
-                                                    <td><?= $row['SalesPersonName']; ?></td>
-                                                    <td><?= number_format($row['TotalSales'], 2); ?></td>
-                                                    <td><?= number_format($row['BonusAmount'], 2); ?></td>
-                                                    <td><?= number_format($row['CurrentPayRate'], 2); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                            </tbody>
-
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
-
-        <!-- Footer -->
-        <footer class="sticky-footer bg-white">
-            <div class="container my-auto text-center">
-                <span>Sales Performance Dashboard © 2024</span>
-            </div>
-        </footer>
     </div>
-</div>
 
-<!-- JS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/startbootstrap-sb-admin-2/4.1.3/js/sb-admin-2.min.js"></script>
 
-<script>
-Highcharts.chart('salesChart', {
-    chart: { type: 'column' },
-    title: { text: 'Sales Performance by Sales Person' },
-    xAxis: {
-        categories: <?= json_encode($salesPerson) ?>,
-        title: { text: 'Sales Person' }
-    },
-    yAxis: {
-        title: { text: 'Sales Amount' }
-    },
-    series: [{
-        name: 'Total Sales',
-        data: <?= json_encode($salesAmount) ?>
-    }]
-});
-</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/startbootstrap-sb-admin-2/4.1.3/js/sb-admin-2.min.js"></script>
+
+    <script>
+        Highcharts.chart('salesChart', {
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: 'Total Transactions per Sales Person'
+            },
+
+            xAxis: {
+                categories: <?= json_encode($salesPerson) ?>,
+                title: {
+                    text: 'Sales Person'
+                }
+            },
+
+            yAxis: {
+                title: {
+                    text: 'Total Transactions'
+                },
+                allowDecimals: false
+            },
+
+            plotOptions: {
+                series: {
+                    cursor: 'pointer',
+                    point: {
+                        events: {
+                            click: function() {
+                                loadProduct(this.category);
+                            }
+                        }
+                    }
+                }
+            },
+
+            series: [{
+                name: 'Total Transactions',
+                data: <?= json_encode($totalTrans) ?>
+            }]
+        });
+
+
+        /* DRILLDOWN : Sales Person → Product */
+        function loadProduct(salesPerson) {
+
+            // DRILLDOWN CHART
+            fetch('get_product_by_salesperson.php?salesPerson=' + encodeURIComponent(salesPerson))
+                .then(res => res.json())
+                .then(data => {
+
+                    Highcharts.chart('salesChart', {
+                        chart: {
+                            type: 'bar'
+                        },
+                        title: {
+                            text: 'Produk yang Dijual oleh ' + salesPerson
+                        },
+                        xAxis: {
+                            type: 'category',
+                            title: {
+                                text: 'Product'
+                            }
+                        },
+                        yAxis: {
+                            title: {
+                                text: 'Total Transactions'
+                            },
+                            allowDecimals: false
+                        },
+                        series: [{
+                            name: 'Total Transactions',
+                            data: data
+                        }]
+                    });
+
+                });
+
+            // ✅ CROSS FILTERING TABLE
+            $('#detailTable').load(
+                'get_salesperson_detail.php?salesPerson=' + encodeURIComponent(salesPerson)
+            );
+        }
+    </script>
 
 </body>
+
 </html>

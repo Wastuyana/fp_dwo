@@ -40,7 +40,7 @@
                 <!-- Begin Page Content -->
                 <h2>W e l c o m e !</h2>
                 <p>Welcome to Dashboard Adventures Works</p>
-                <p>Dashboard ini akan menampilkan beberapa grafik berdasarkan data penjualan Adventure Works dan juga tampilan OLAP yang di integrasikan dengan Mondrian</p>
+                <p></p>
                
                 
                
